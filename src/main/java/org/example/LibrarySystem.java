@@ -2,12 +2,14 @@ package org.example;
 
 import java.sql.*;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+
 import java.util.Scanner;
 
-public class LibrarySystem {
-    private  static Scanner scanner = new Scanner(System.in);
 
+public class LibrarySystem {
+    private static Scanner scanner = new Scanner(System.in);
+
+    // Metod för att logga in en användare
     public static User login() {
         System.out.println("Ange användarnamn: ");
         String username = scanner.nextLine();
@@ -15,25 +17,28 @@ public class LibrarySystem {
         System.out.println("Ange lösenord: ");
         String password = scanner.nextLine();
 
+        // SQL-fråga för att hämta användaren från databasen
         String sql = "SELECT * FROM Users WHERE user = ? AND password = ?";
+        // Skapa en databasanslutning
         try (Connection conn = Database.getConnection();
-            PreparedStatement ps = conn.prepareStatement(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, username);
             ps.setString(2, password);
             ResultSet rs = ps.executeQuery();
 
-            if (rs.next()) {
+            if (rs.next()) { // Om användaren finns i databasen
                 return new User(rs.getLong("id"), rs.getString("user"), rs.getString("password"),
                         rs.getString("namn"), rs.getString("email"));
             } else {
                 System.out.println("Fel användarnamn eller lösenord.");
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            e.printStackTrace(); // Hanterar SQL fel
         }
-        return null;
+        return null; // Om login misslyckas, returnera null
     }
 
+    // Metod för att upptadera användarens profil
     public static void updateProfile(User user) {
         System.out.println("Uppdatera din profil:");
         System.out.print("Nytt användarnamn: ");
@@ -53,7 +58,7 @@ public class LibrarySystem {
             stmt.setString(1, newUsername);
             stmt.setString(2, newName);
             stmt.setString(3, newEmail);
-            stmt.setString(4, newPassword); // OBS! Lösenordet borde helst vara krypterat.
+            stmt.setString(4, newPassword);
             stmt.setLong(5, user.getId());
 
             int rowsUpdated = stmt.executeUpdate();
@@ -61,11 +66,11 @@ public class LibrarySystem {
             if (rowsUpdated > 0) {
                 System.out.println("Profilen har uppdaterats!");
 
-                // Uppdatera användarens lokala data
+                // Uppdatera användarens lokala data med de nya värdena
                 user.setUsername(newUsername);
                 user.setName(newName);
                 user.setEmail(newEmail);
-                user.setPassword(newPassword); // Uppdatera även här om lösenordet ändras
+                user.setPassword(newPassword);
             } else {
                 System.out.println("Misslyckades med att uppdatera profilen.");
             }
@@ -76,6 +81,7 @@ public class LibrarySystem {
         }
     }
 
+    // Metod för att list alla böcker i bibliotek
     public static void listBooks() {
         String query = "SELECT title, author, type, borrowed FROM Books ORDER BY title";
 
@@ -100,6 +106,7 @@ public class LibrarySystem {
         }
     }
 
+    // Metod för att låna en bok
     public static void borrowBook(User user) {
         System.out.print("Ange boktitel att låna: ");
         String title = scanner.nextLine();
@@ -121,8 +128,8 @@ public class LibrarySystem {
                 LocalDate borrowDate = LocalDate.now();
                 LocalDate returnDate = borrowDate.plusDays(loanDays);
 
-                String insertQuery  = "INSERT INTO Borrow (userId, bookId, borrowDate, returnDate) VALUES (?, ?, ?, ?)";
-                try (PreparedStatement insertStmt = conn.prepareStatement(insertQuery )) {
+                String insertQuery = "INSERT INTO Borrow (userId, bookId, borrowDate, returnDate) VALUES (?, ?, ?, ?)";
+                try (PreparedStatement insertStmt = conn.prepareStatement(insertQuery)) {
                     insertStmt.setLong(1, user.getId());
                     insertStmt.setLong(2, bookId);
                     insertStmt.setDate(3, Date.valueOf(borrowDate));
@@ -148,9 +155,10 @@ public class LibrarySystem {
         }
     }
 
+    //  Metod för att visa lånade böcker
     public static void viewBorrowedBooks(User user) {
         String query = "SELECT Books.title, Borrow.borrowDate, Borrow.returnDate " +
-                        "FROM Borrow JOIN Books ON Borrow.bookId = Books.id WHERE Borrow.userId = ?";
+                "FROM Borrow JOIN Books ON Borrow.bookId = Books.id WHERE Borrow.userId = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
 
@@ -161,8 +169,9 @@ public class LibrarySystem {
             System.out.println("Dina lånade böcker: ");
             while (rs.next()) {
                 System.out.println("Titel: " + rs.getString("title") +
-                                    ", Lånedatum: " + rs.getDate("borrowDate") +
-                                    ", Tillbakadatum: " + rs.getDate("returnDate"));
+                        ", Lånedatum: " + rs.getDate("borrowDate") +
+                        ", Tillbakadatum: " + rs.getDate("returnDate"));
+                hasBooks = true;
             }
 
             if (!hasBooks) {
@@ -175,6 +184,9 @@ public class LibrarySystem {
         }
     }
 
+
+
+    // Metod för att återlämna en bok
     public static void returnBook(User user) {
         System.out.print("Ange boktitel att lämna tillbaka: ");
         String title = scanner.nextLine();
@@ -214,7 +226,7 @@ public class LibrarySystem {
         }
     }
 
-
+    // Metod för att reservera en bok
     public static void reserveBook(Scanner scanner, User user) {
         System.out.print("Ange titeln på boken du vill reservera: ");
         String bookTitle = scanner.nextLine();
@@ -231,7 +243,7 @@ public class LibrarySystem {
                     long bookId = rs.getLong("id");
 
                     // SQL-fråga för att reservera boken
-                    String reserveQuery = "INSERT INTO Reservations (userId, bookId, reservationDate) VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY))";
+                    String reserveQuery = "INSERT INTO Reservations (userId, bookId, reservationDate, availableTo) VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY))";
                     try (PreparedStatement reserveStmt = conn.prepareStatement(reserveQuery)) {
                         reserveStmt.setLong(1, user.getId());
                         reserveStmt.setLong(2, bookId);
@@ -248,88 +260,62 @@ public class LibrarySystem {
     }
 
 
+    public static void searchBooks() {
+        System.out.println("Välj sökalternativ:");
+        System.out.println("1. Sök på titel");
+        System.out.println("2. Sök på författare");
+        System.out.println("3. Generell sökning");
+        System.out.print("Välj ett alternativ: ");
+        int choice = Integer.parseInt(scanner.nextLine());
 
-    /*
-    public static void reserveBook(Scanner scanner, User user) {
-        System.out.print("Ange titeln på boken du vill reservera: ");
-        String bookTitle = scanner.nextLine();
+        System.out.print("Ange sökterm: ");
+        String searchTerm = scanner.nextLine();
 
-        try (Connection conn = Database.getConnection()) {
-            String reserveQuery = "INSERT INTO reservations (user_id, book_id, reservation_date) VALUES (?, ?, NOW())";
-
-            try (PreparedStatement stmt = conn.prepareStatement(reserveQuery)) {
-                stmt.setLong(1, user.getId());
-                stmt.setLong(2, bookId);
-                stmt.executeUpdate();
-                System.out.println("Boken har reserverats.");
-            }
-        } catch (SQLException e) {
-            System.out.println("Ett fel uppstod: " + e.getMessage());
+        String query = "";
+        switch (choice) {
+            case 1:
+                query = "SELECT * FROM Books WHERE title LIKE ?";
+                break;
+            case 2:
+                query = "SELECT * FROM Books WHERE author LIKE ?";
+                break;
+            case 3:
+                query = "SELECT * FROM Books WHERE title LIKE ? OR author LIKE ? OR type LIKE ?";
+                break;
+                default:
+                    System.out.println("Ogiltigt val.");
+                    return;
         }
-    }
-
-
-     */
-
-
-    /*
-    public static void reserveBook(User user) {
-        System.out.print("Ange titeln på boken du vill reservera: ");
-        String bookTitle = scanner.nextLine();
-
-        // SQL för att hämta boken och kontrollera dess status
-        String checkBookQuery = "SELECT id, title, borrowed, reserved FROM Books WHERE title LIKE ?";
-        String checkReservationQuery = "SELECT * FROM Reservations WHERE bookId = ? AND availableTo >= CURDATE()";
-        String reserveBookQuery = "INSERT INTO Reservations (userId, bookId, reservationDate, availableTo) VALUES (?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY))";
 
         try (Connection conn = Database.getConnection();
-             PreparedStatement checkStmt = conn.prepareStatement(checkBookQuery)) {
+            PreparedStatement stmt = conn.prepareStatement(query)) {
 
-            // Kontrollera om boken finns och är utlånad
-            checkStmt.setString(1, "%" + bookTitle.trim() + "%");
-            ResultSet rs = checkStmt.executeQuery();
-
-            if (rs.next()) {
-                long bookId = rs.getLong("id");
-                String title = rs.getString("title");
-                boolean isBorrowed = rs.getBoolean("borrowed");
-
-
-                // Kolla om boken är reserverad
-                try (PreparedStatement checkReservationStmt = conn.prepareStatement(checkReservationQuery)) {
-                    checkReservationStmt.setLong(1, bookId);
-                    ResultSet reservationRs = checkReservationStmt.executeQuery();
-
-                    if (reservationRs.next()) {
-                        System.out.println("Boken '" + title + "' är redan reserverad.");
-                    } else if (isBorrowed) {
-                        // Boken är utlånad, skapa en reservation
-                        try (PreparedStatement reserveStmt = conn.prepareStatement(reserveBookQuery)) {
-                            reserveStmt.setLong(1, user.getId());
-                            reserveStmt.setLong(2, bookId);
-                            reserveStmt.executeUpdate();
-
-                            // Beräkna det tillgängliga datumet
-                            LocalDate reservationAvailableDate = LocalDate.now().plusDays(30);
-                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                            String formattedDate = reservationAvailableDate.format(formatter);
-
-                            System.out.println("Boken '" + title + "' har reserverats. Reservationen gäller i 30 dagar efter att boken blir tillgänglig.");
-                        }
-                    } else {
-                        System.out.println("Boken '" + title + "' är tillgänglig och behöver inte reserveras.");
-                    }
-                }
+            if (choice == 3) {
+                stmt.setString(1, "%" + searchTerm + "%");
+                stmt.setString(2, "%" + searchTerm + "%");
+                stmt.setString(3, "%" + searchTerm + "%");
             } else {
-                System.out.println("Boken hittades inte.");
+                stmt.setString(1, "%" + searchTerm + "%");
+            }
+
+            ResultSet rs = stmt.executeQuery();
+
+            System.out.println("Sökresultat:");
+            while (rs.next()) {
+                String title = rs.getString("title");
+                String author = rs.getString("author");
+                String type = rs.getString("type");
+                boolean borrowed = rs.getBoolean("Borrowed");
+
+                String status = borrowed ? "Utlånad" : "Tillgänglig";
+                System.out.println("- " + title + " av " + author + " (" + type + ") [" + status + "]");
             }
 
         } catch (SQLException e) {
             e.printStackTrace();
-            System.out.println("Ett fel uppstod vid reservation av boken.");
+            System.out.println("Ett fel uppstod vid sökning.");
         }
     }
 
-     */
-
 }
+
